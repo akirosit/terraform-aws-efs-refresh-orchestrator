@@ -33,7 +33,9 @@ resource "aws_s3_bucket" "refresh_bucket" {
   bucket_prefix = var.s3_bucket_name == null ? local.name : null
 }
 locals {
-  refresh_bucket_id = var.s3_bucket_name == null ? aws_s3_bucket.refresh_bucket[0].id : var.s3_bucket_name
+  refresh_bucket_id = var.s3_bucket_name == null ? (
+    var.create_s3_bucket ? aws_s3_bucket.refresh_bucket[0].id : null
+  ) : var.s3_bucket_name
 }
 
 resource "aws_s3_object" "step_function_json_input" {
