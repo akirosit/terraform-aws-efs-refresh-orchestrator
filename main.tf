@@ -29,11 +29,11 @@ resource "local_file" "step_function_json_input" {
 
 resource "aws_s3_bucket" "refresh_bucket" {
   count         = var.create_s3_bucket ? 1 : 0
-  bucket        = var.s3_bucket_name ? var.s3_bucket_name : null
-  bucket_prefix = var.s3_bucket_name ? null : local.name
+  bucket        = var.s3_bucket_name == null ? null : var.s3_bucket_name
+  bucket_prefix = var.s3_bucket_name == null ? local.name : null
 }
 locals {
-  refresh_bucket_id = var.s3_bucket_name ? var.s3_bucket_name : aws_s3_bucket.refresh_bucket[0].id
+  refresh_bucket_id = var.s3_bucket_name == null ? aws_s3_bucket.refresh_bucket[0].id : var.s3_bucket_name
 }
 
 resource "aws_s3_object" "step_function_json_input" {
