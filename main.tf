@@ -17,7 +17,7 @@ locals {
 }
 
 resource "aws_sfn_state_machine" "refresh_env" {
-  name       = "${local.name_cc}Efs"
+  name       = local.name_cc
   role_arn   = aws_iam_role.step_function.arn
   definition = templatefile("${path.module}/templates/step_function_definition.json", {})
 }
