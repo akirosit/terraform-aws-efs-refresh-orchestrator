@@ -9,7 +9,7 @@
     "TagEnvironment": "preprod",
     "DynamoDBTableName": "${DynamoDBTable}",
     "SNSTopicArn": "${SnsTopicArn}",
-    "SNSSubject": "Application ${AppName}: restore of the EFS ${SourceEFSName} [COMPLETED]",
+    "SNSSubject": "Application ${AppName}: restore of the EFS ${SourceEFSId} [COMPLETED]",
     "SNSMessage": "The restore of the database instance ${EFSName} from the source ${SourceEFSId} has been completed successfully.",
     "SNSSubjectFailure": "Application ${AppName}: restore of the database instance ${SourceEFSId} [FAILED]",
     "SNSMessageFailure": "The restore of the database instance ${EFSName} from the source ${SourceEFSId} has failed."
