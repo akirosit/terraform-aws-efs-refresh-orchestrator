@@ -1,6 +1,6 @@
 {
     "Comment": "Input for the EFS State Machine",
-    "SourceEFSName": "${SourceEFSName}",
+    "SourceEFSId": "${SourceEFSId}",
     "TmpEFSName": "${EFSName}-restore",
     "EFSName": "${EFSName}",
     "AWSBackupRoleArn": "${AWSBackupRoleArn}",

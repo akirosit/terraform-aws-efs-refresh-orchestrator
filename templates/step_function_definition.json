@@ -10,7 +10,7 @@
       "Type": "Task",
       "Next": "get-latest-recovery-point",
       "Parameters": {
-        "CreationToken.$": "$.SourceEFSName"
+        "FileSystemId.$": "$.SourceEFSId"
       },
       "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
       "ResultSelector": {
