@@ -10,7 +10,7 @@
     "DynamoDBTableName": "${DynamoDBTable}",
     "SNSTopicArn": "${SnsTopicArn}",
     "SNSSubject": "Application ${AppName}: restore of the EFS ${SourceEFSName} [COMPLETED]",
-    "SNSMessage": "The restore of the database instance ${EFSName} from the source ${SourceEFSName} has been completed successfully.",
-    "SNSSubjectFailure": "Application ${AppName}: restore of the database instance ${SourceEFSName} [FAILED]",
-    "SNSMessageFailure": "The restore of the database instance ${EFSName} from the source ${SourceEFSName} has failed."
+    "SNSMessage": "The restore of the database instance ${EFSName} from the source ${SourceEFSId} has been completed successfully.",
+    "SNSSubjectFailure": "Application ${AppName}: restore of the database instance ${SourceEFSId} [FAILED]",
+    "SNSMessageFailure": "The restore of the database instance ${EFSName} from the source ${SourceEFSId} has failed."
 }
