@@ -27,17 +27,26 @@ resource "local_file" "step_function_json_input" {
   filename = "${path.module}/files/efs-json/${local.current_region}/efs-${each.key}.json"
 }
 
+resource "aws_s3_bucket" "refresh_bucket" {
+  count         = var.create_s3_bucket ? 1 : 0
+  bucket        = var.s3_bucket_name ? var.s3_bucket_name : null
+  bucket_prefix = var.s3_bucket_name ? null : local.name
+}
+locals {
+  refresh_bucket_id = var.s3_bucket_name ? var.s3_bucket_name : aws_s3_bucket.refresh_bucket[0].id
+}
+
 resource "aws_s3_object" "step_function_json_input" {
-  for_each = local.step_function_input
-  bucket   = aws_s3_bucket.refresh_bucket.id
+  for_each = var.put_step_function_input_json_files_on_s3 ? local.step_function_input : {}
+  bucket   = local.refresh_bucket_id
   key      = "efs-json/${local.current_region}/efs-${each.key}.json"
   source   = local_file.step_function_json_input[each.key].filename
   etag     = local_file.step_function_json_input[each.key].content_md5
 }
 
 resource "aws_s3_object" "step_function_json_input_hash" {
-  for_each = local.step_function_input
-  bucket   = aws_s3_bucket.refresh_bucket.id
+  for_each = var.put_step_function_input_json_files_on_s3 ? local.step_function_input : {}
+  bucket   = local.refresh_bucket_id
   key      = "efs-json/${local.current_region}/efs-${each.key}.json.base64sha256"
   content  = local_file.step_function_json_input[each.key].content_base64sha256
 }
