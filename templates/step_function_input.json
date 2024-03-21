@@ -1,0 +1,16 @@
+{
+    "Comment": "Input for the EFS State Machine",
+    "SourceEFSName": "${SourceEFSName}",
+    "TmpEFSName": "${EFSName}-restore",
+    "EFSName": "${EFSName}",
+    "AWSBackupRoleArn": "${AWSBackupRoleArn}",
+    "ItemsToRestore": ${jsonencode(ItemsToRestore)},
+    "TagApplication": "${AppName}",
+    "TagEnvironment": "preprod",
+    "DynamoDBTableName": "${DynamoDBTable}",
+    "SNSTopicArn": "${SnsTopicArn}",
+    "SNSSubject": "Application ${AppName}: restore of the EFS ${SourceEFSName} [COMPLETED]",
+    "SNSMessage": "The restore of the database instance ${EFSName} from the source ${SourceEFSName} has been completed successfully.",
+    "SNSSubjectFailure": "Application ${AppName}: restore of the database instance ${SourceEFSName} [FAILED]",
+    "SNSMessageFailure": "The restore of the database instance ${EFSName} from the source ${SourceEFSName} has failed."
+}

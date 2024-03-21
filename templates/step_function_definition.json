@@ -1,0 +1,348 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "RESTORE",
+  "States": {
+    "RESTORE": {
+      "Type": "Pass",
+      "Next": "get-source-efs-arn"
+    },
+    "get-source-efs-arn": {
+      "Type": "Task",
+      "Next": "get-latest-recovery-point",
+      "Parameters": {
+        "CreationToken.$": "$.SourceEFSName"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
+      "ResultSelector": {
+        "FileSystemArn.$": "$.FileSystems[0].FileSystemArn",
+        "FileSystemId.$": "$.FileSystems[0].FileSystemId"
+      },
+      "ResultPath": "$.get-source-efs-arn-result"
+    },
+    "get-latest-recovery-point": {
+      "Type": "Task",
+      "Next": "start-restore-job",
+      "Parameters": {
+        "ResourceArn.$": "$.get-source-efs-arn-result.FileSystemArn"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:backup:listRecoveryPointsByResource",
+      "ResultPath": "$.get-latest-recovery-point",
+      "ResultSelector": {
+        "RecoveryPointArn.$": "$.RecoveryPoints[0].RecoveryPointArn",
+        "RecoveryPointCreationDate.$": "$.RecoveryPoints[0].CreationDate"
+      }
+    },
+    "start-restore-job": {
+      "Type": "Task",
+      "Next": "wait-restore-done",
+      "Parameters": {
+        "IamRoleArn": "$.AWSBackupRoleArn",
+        "Metadata": {
+          "file-system-id.$": "$.get-source-efs-arn-result.FileSystemId",
+          "Encrypted": "false",
+          "PerformanceMode": "generalPurpose",
+          "CreationToken.$": "$.TmpEFSName",
+          "newFileSystem": "true"
+        },
+        "RecoveryPointArn.$": "$.get-latest-recovery-point.RecoveryPointArn"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:backup:startRestoreJob",
+      "ResultPath": "$.start-restore-job-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.start-restore-job-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "wait-restore-done": {
+      "Type": "Wait",
+      "Seconds": 10,
+      "Next": "get-restore-status"
+    },
+    "get-restore-status": {
+      "Type": "Task",
+      "Next": "outcome-restore-status",
+      "Parameters": {
+        "RestoreJobId.$": "$.start-restore-job-result.RestoreJobId"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:backup:describeRestoreJob",
+      "ResultPath": "$.get-restore-status-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.start-restore-job-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "outcome-restore-status": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.get-restore-status-result.Status",
+          "StringEquals": "COMPLETED",
+          "Next": "tag-restored-efs"
+        }
+      ],
+      "Default": "wait-restore-done"
+    },
+    "tag-restored-efs": {
+      "Type": "Task",
+      "Next": "POST-RESTORE",
+      "Parameters": {
+        "ResourceId.$": "$.get-restore-status-result.CreatedResourceArn",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value.$": "$.TmpEFSName"
+          },
+          {
+            "Key": "Application",
+            "Value.$": "$.TagApplication"
+          },
+          {
+            "Key": "Environment",
+            "Value.$": "$.TagEnvironment"
+          },
+          {
+            "Key": "refresh",
+            "Value": "true"
+          },
+          {
+            "Key": "refresh-efs",
+            "Value.$": "$.SourceEFSName"
+          }
+        ]
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:tagResource",
+      "ResultPath": "$.tag-restored-efs-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.tag-restored-efs-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "POST-RESTORE": {
+      "Type": "Pass",
+      "Next": "get-old-efs-arn"
+    },
+    "get-old-efs-arn": {
+      "Type": "Task",
+      "Next": "check-efs-to-replace-tags",
+      "Parameters": {
+        "CreationToken.$": "$.EFSName"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
+      "ResultSelector": {
+        "FileSystemArn.$": "$.FileSystems[0].FileSystemArn",
+        "FileSystemId.$": "$.FileSystems[0].FileSystemId"
+      },
+      "ResultPath": "$.get-old-efs-arn-result"
+    },
+    "check-efs-to-replace-tags": {
+      "Type": "Task",
+      "Next": "outcome-check-efs-to-replace-tags",
+      "Resource": "arn:aws:states:::aws-sdk:efs:listTagsForResource",
+      "Parameters": {
+        "ResourceId.$": "$.get-old-efs-arn-result.FileSystemArn"
+      },
+      "ResultSelector": {
+        "TagRefresh.$": "States.ArrayGetItem($.Tags[?(@.Key=='refresh')].Value,0)"
+      },
+      "ResultPath": "$.check-efs-to-replace-tags-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.check-efs-to-replace-tags-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "outcome-check-efs-to-replace-tags": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.check-efs-to-replace-tags-result.TagRefresh",
+          "StringEquals": "true",
+          "Next": "delete-old-efs"
+        }
+      ],
+      "Default": "update-dynamodb-failure"
+    },
+    "delete-old-efs": {
+      "Type": "Task",
+      "Next": "tag-restored-efs-final",
+      "Parameters": {
+        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:deleteFileSystem",
+      "ResultPath": "$.delete-old-efs-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.delete-old-efs-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "tag-restored-efs-final": {
+      "Type": "Task",
+      "Next": "update-dynamodb",
+      "Parameters": {
+        "ResourceId.$": "$.get-restore-status-result.CreatedResourceArn",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value.$": "$.TmpEFSName"
+          }
+        ]
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:tagResource",
+      "ResultPath": "$.tag-restored-efs-final-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.tag-restored-efs-final-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "update-dynamodb": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName.$": "$.DynamoDBTableName",
+        "Item": {
+          "appname": {
+            "S.$": "$.TagApplication"
+          },
+          "environment": {
+            "S.$": "$.TagEnvironment"
+          },
+          "instance": {
+            "S.$": "$.EFSName"
+          },
+          "source": {
+            "S.$": "$.SourceEFSName"
+          },
+          "restoretype": {
+            "S": "restore-efs-backup"
+          },
+          "snapshot": {
+            "S": "$.RecoveryPoints[0].RecoveryPointArn"
+          },
+          "status": {
+            "S": "completed"
+          },
+          "restoredate": {
+            "S": "$$.State.StartTime"
+          },
+          "restoretime": {
+            "S": "$$.State.EnteredTime"
+          }
+        }
+      },
+      "TimeoutSeconds": 300,
+      "HeartbeatSeconds": 60,
+      "ResultPath": "$.update-dynamodb-result",
+      "Next": "send-msg"
+    },
+    "send-msg": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn.$": "$.SNSTopicArn",
+        "Subject.$": "$.SNSSubject",
+        "Message.$": "$.SNSMessage"
+      },
+      "TimeoutSeconds": 300,
+      "HeartbeatSeconds": 60,
+      "ResultPath": "$.sendmsg-result",
+      "Next": "RESTORE-COMPLETE"
+    },
+    "RESTORE-COMPLETE": {
+      "Type": "Pass",
+      "End": true
+    },
+    "update-dynamodb-failure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "TimeoutSeconds": 300,
+      "HeartbeatSeconds": 60,
+      "Parameters": {
+        "TableName.$": "$.DynamoDBTableName",
+        "Item": {
+          "appname": {
+            "S.$": "$.TagApplication"
+          },
+          "environment": {
+            "S.$": "$.TagEnvironment"
+          },
+          "instance": {
+            "S.$": "$.EFSName"
+          },
+          "source": {
+            "S.$": "$.SourceEFSName"
+          },
+          "restoretype": {
+            "S": "restore-efs-backup"
+          },
+          "snapshot": {
+            "S": "$.RecoveryPoints[0].RecoveryPointArn"
+          },
+          "status": {
+            "S": "failed"
+          },
+          "restoredate": {
+            "S": "$$.State.StartTime"
+          },
+          "restoretime": {
+            "S": "$$.State.EnteredTime"
+          }
+        }
+      },
+      "ResultPath": "$.update-dynamodb-failure-result",
+      "Next": "send-msg-failure"
+    },
+    "send-msg-failure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "TimeoutSeconds": 300,
+      "HeartbeatSeconds": 60,
+      "Parameters": {
+        "TopicArn.$": "$.SNSTopicArn",
+        "Subject.$": "$.SNSSubjectFailure",
+        "Message.$": "$.SNSMessageFailure"
+      },
+      "ResultPath": "$.sendmsg-result",
+      "Next": "RESTORE-FAILED"
+    },
+    "RESTORE-FAILED": {
+      "Type": "Fail",
+      "Error": "Restore failed",
+      "Cause": "One of the states failed. Please check the logs"
+    }
+  }
+}
