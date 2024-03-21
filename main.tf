@@ -8,7 +8,7 @@ locals {
       KmsKeyId         = app_input.KmsKeyId
       SourceEFSName    = app_input.SourceEFSName
       EFSName          = app_input.EFSName
-      AWSBackupRoleArn = local.local.aws_backup_arn
+      AWSBackupRoleArn = local.aws_backup_arn
       ItemsToRestore   = app_input.ItemsToRestore
       DynamoDBTable    = aws_dynamodb_table.dynamodbTable.name
       SnsTopicArn      = local.sns_topic_arn
@@ -16,12 +16,12 @@ locals {
   }
 }
 
-resource "aws_sfn_state_machine" "refresh_env_efs" {
+resource "aws_sfn_state_machine" "refresh_env" {
   name       = "${local.name_cc}Efs"
-  role_arn   = aws_iam_role.step_function_efs.arn
+  role_arn   = aws_iam_role.step_function.arn
   definition = templatefile("${path.module}/templates/step_function_definition.json", {})
 }
-resource "local_file" "step_function_json_efs_input" {
+resource "local_file" "step_function_json_input" {
   for_each = local.step_function_input
   content  = templatefile("${path.module}/templates/step_function_input.json", each.value)
   filename = "${path.module}/files/efs-json/${local.current_region}/efs-${each.key}.json"
