@@ -1,6 +1,6 @@
 variable "efs_to_refresh" {
   type = map(object({
-    SourceEFSName  = string
+    SourceEFSId    = string
     EFSName        = string
     EFSArn         = string
     Encrypted      = optional(bool)

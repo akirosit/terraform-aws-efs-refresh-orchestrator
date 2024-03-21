@@ -6,7 +6,7 @@ locals {
       AppName          = app_name
       Encrypted        = app_input.Encrypted
       KmsKeyId         = app_input.KmsKeyId
-      SourceEFSName    = app_input.SourceEFSName
+      SourceEFSId      = app_input.SourceEFSId
       EFSName          = app_input.EFSName
       AWSBackupRoleArn = local.aws_backup_arn
       ItemsToRestore   = app_input.ItemsToRestore
