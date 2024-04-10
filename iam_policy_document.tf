@@ -1,12 +1,5 @@
 # Purpose: This file is used to create IAM policy documents for the lambda role and step function role.
 
-# Locals block to store the EFS ARNs
-locals {
-  efs_arn = [
-    for app_name, app_input in var.efs_to_refresh : app_input.EFSArn
-  ]
-}
-
 #
 # Step Function IAM Policy Document
 #
@@ -58,16 +51,71 @@ data "aws_iam_policy_document" "step_function_role" {
     effect = "Allow"
     actions = [
       "elasticfilesystem:DescribeFileSystems",
+      "elasticfilesystem:CreateMountTarget",
+      "elasticfilesystem:DescribeMountTargets",
       "elasticfilesystem:ListTagsForResource",
-      "elasticfilesystem:TagResource"
+      "elasticfilesystem:TagResource",
+      "elasticfilesystem:CreateAccessPoint"
     ]
     resources = ["*"]
   }
   statement {
     effect = "Allow"
     actions = [
-      "elasticfilesystem:DeleteFileSystem"
+      "ec2:DescribeSubnets",
+      "ec2:DescribeNetworkInterfaces",
+      "ec2:CreateNetworkInterface"
     ]
-    resources = local.efs_arn
+    resources = ["*"]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "lambda:InvokeFunction",
+      "lambda:InvokeAsync",
+      "lambda:UpdateFunctionConfiguration"
+    ]
+    resources = [for lambda in aws_lambda_function.functions : lambda.arn]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "states:StartExecution"
+    ]
+    resources = [aws_sfn_state_machine.refresh_env.arn]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "tag:TagResources",
+      "elasticfilesystem:CreateTags"
+    ]
+    resources = ["*"]
+  }
+}
+
+#
+# Lambda IAM Policy Document
+#
+data "aws_iam_policy_document" "assume_from_lambda" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "lambda_role" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "elasticfilesystem:DescribeFileSystems",
+      "elasticfilesystem:DescribeMountTargets",
+      "elasticfilesystem:ListTagsForResource",
+      "elasticfilesystem:TagResource"
+    ]
+    resources = ["*"]
   }
 }

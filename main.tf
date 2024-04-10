@@ -2,29 +2,32 @@
 
 locals {
   step_function_input = {
-    for app_name, app_input in var.efs_to_refresh : app_name => {
-      AppName          = app_name
-      Encrypted        = app_input.Encrypted
-      KmsKeyId         = app_input.KmsKeyId
-      SourceEFSId      = app_input.SourceEFSId
-      EFSName          = app_input.EFSName
-      AWSBackupRoleArn = local.aws_backup_arn
-      ItemsToRestore   = app_input.ItemsToRestore
-      DynamoDBTable    = aws_dynamodb_table.dynamodbTable.name
-      SnsTopicArn      = local.sns_topic_arn
-    }
+    AppName           = var.app_name
+    EnvName           = var.env_name
+    SourceEFSId       = var.source_efs_id
+    EFSId             = var.efs_id
+    DeleteOldEfs      = var.delete_old_efs
+    AWSBackupRoleArn  = local.aws_backup_arn
+    ItemsToRestore    = jsonencode(var.items_to_restore)
+    LambdaEfsFunction = aws_lambda_function.functions["GetEfsRestoreBackupDirectory"].function_name
+    SubnetIDs         = jsonencode(var.private_subnets_ids)
+    SecurityGroupID   = jsonencode([var.efs_sg_id])
+    Encrypted         = var.encrypted
+    KmsKeyId          = var.kms_key_id == null ? "" : var.kms_key_id
+    DynamoDBTable     = aws_dynamodb_table.dynamodbTable.name
+    SnsTopicArn       = local.sns_topic_arn
+    Tags              = jsonencode(var.tags)
   }
 }
 
 resource "aws_sfn_state_machine" "refresh_env" {
   name       = local.name_cc
   role_arn   = aws_iam_role.step_function.arn
-  definition = templatefile("${path.module}/templates/step_function_definition.json", {})
+  definition = templatefile("${path.module}/templates/step_function_definition.json", local.step_function_input)
 }
 resource "local_file" "step_function_json_input" {
-  for_each = local.step_function_input
-  content  = templatefile("${path.module}/templates/step_function_input.json", each.value)
-  filename = "${path.module}/files/efs-json/${local.current_region}/efs-${each.key}.json"
+  content  = templatefile("${path.module}/templates/step_function_input.json", local.step_function_input)
+  filename = "step_funcion_input/${local.current_region}/efs-${var.app_name}-${var.env_name}.json"
 }
 
 resource "aws_s3_bucket" "refresh_bucket" {
@@ -39,16 +42,16 @@ locals {
 }
 
 resource "aws_s3_object" "step_function_json_input" {
-  for_each = var.put_step_function_input_json_files_on_s3 ? local.step_function_input : {}
-  bucket   = local.refresh_bucket_id
-  key      = "efs-json/${local.current_region}/efs-${each.key}.json"
-  source   = local_file.step_function_json_input[each.key].filename
-  etag     = local_file.step_function_json_input[each.key].content_md5
+  count  = var.put_step_function_input_json_files_on_s3 ? 1 : 0
+  bucket = local.refresh_bucket_id
+  key    = "efs-json/${local.current_region}/efs-${var.app_name}-${var.env_name}.json"
+  source = local_file.step_function_json_input.filename
+  etag   = local_file.step_function_json_input.content_md5
 }
 
 resource "aws_s3_object" "step_function_json_input_hash" {
-  for_each = var.put_step_function_input_json_files_on_s3 ? local.step_function_input : {}
-  bucket   = local.refresh_bucket_id
-  key      = "efs-json/${local.current_region}/efs-${each.key}.json.base64sha256"
-  content  = local_file.step_function_json_input[each.key].content_base64sha256
+  count   = var.put_step_function_input_json_files_on_s3 ? 1 : 0
+  bucket  = local.refresh_bucket_id
+  key     = "efs-json/${local.current_region}/efs-${var.app_name}-${var.env_name}.json.base64sha256"
+  content = local_file.step_function_json_input.content_base64sha256
 }

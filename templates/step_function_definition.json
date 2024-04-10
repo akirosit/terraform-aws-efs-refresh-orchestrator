@@ -1,7 +1,26 @@
 {
   "Comment": "A description of my state machine",
-  "StartAt": "RESTORE",
+  "StartAt": "defaults-values",
   "States": {
+    "defaults-values": {
+      "Type": "Pass",
+      "Next": "merge-tags",
+      "ResultPath": "$.defaultValues",
+      "Parameters": {
+        "Tags": {
+          "refresh": "true",
+          "refresh-efs.$": "$.SourceEFSId"
+        }
+      }
+    },
+    "merge-tags": {
+      "Type": "Pass",
+      "Next": "RESTORE",
+      "ResultPath": "$.allTags",
+      "Parameters": {
+        "Tags.$": "States.JsonMerge($.defaultValues.Tags, $.Tags, false)"
+      }
+    },
     "RESTORE": {
       "Type": "Pass",
       "Next": "get-source-efs-arn"
@@ -36,13 +55,15 @@
       "Type": "Task",
       "Next": "wait-restore-done",
       "Parameters": {
-        "IamRoleArn": "$.AWSBackupRoleArn",
+        "IamRoleArn.$": "$.AWSBackupRoleArn",
         "Metadata": {
           "file-system-id.$": "$.get-source-efs-arn-result.FileSystemId",
-          "Encrypted": "false",
+          "Encrypted.$": "$.Encrypted",
+          "KmsKeyId.$": "$.KmsKeyId",
           "PerformanceMode": "generalPurpose",
-          "CreationToken.$": "$.TmpEFSName",
-          "newFileSystem": "true"
+          "CreationToken.$": "States.UUID()",
+          "newFileSystem.$": "$.newFileSystem",
+          "ItemsToRestore.$": "$.ItemsToRestore"
         },
         "RecoveryPointArn.$": "$.get-latest-recovery-point.RecoveryPointArn"
       },
@@ -96,33 +117,11 @@
     },
     "tag-restored-efs": {
       "Type": "Task",
-      "Next": "POST-RESTORE",
       "Parameters": {
-        "ResourceId.$": "$.get-restore-status-result.CreatedResourceArn",
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value.$": "$.TmpEFSName"
-          },
-          {
-            "Key": "Application",
-            "Value.$": "$.TagApplication"
-          },
-          {
-            "Key": "Environment",
-            "Value.$": "$.TagEnvironment"
-          },
-          {
-            "Key": "refresh",
-            "Value": "true"
-          },
-          {
-            "Key": "refresh-efs",
-            "Value.$": "$.SourceEFSName"
-          }
-        ]
+        "ResourceARNList.$": "States.Array($['get-restore-status-result']['CreatedResourceArn'])",
+        "Tags.$": "$.allTags.Tags"
       },
-      "Resource": "arn:aws:states:::aws-sdk:efs:tagResource",
+      "Resource": "arn:aws:states:::aws-sdk:resourcegroupstaggingapi:tagResources",
       "ResultPath": "$.tag-restored-efs-result",
       "Catch": [
         {
@@ -133,9 +132,22 @@
           "ResultPath": "$.tag-restored-efs-errormsg",
           "Next": "update-dynamodb-failure"
         }
-      ]
+      ],
+      "Next": "choice-delete-old-efs"
     },
-    "POST-RESTORE": {
+    "choice-delete-old-efs": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.DeleteOldEfs",
+          "BooleanEquals": true,
+          "Next": "DELETE-OLD-EFS"
+        }
+      ],
+      "Default": "POST-RESTORE"
+    },
+    "DELETE-OLD-EFS": {
+      "Comment": "Post-restore steps",
       "Type": "Pass",
       "Next": "get-old-efs-arn"
     },
@@ -143,7 +155,7 @@
       "Type": "Task",
       "Next": "check-efs-to-replace-tags",
       "Parameters": {
-        "CreationToken.$": "$.EFSName"
+        "CreationToken.$": "$.CreationToken"
       },
       "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
       "ResultSelector": {
@@ -187,7 +199,7 @@
     },
     "delete-old-efs": {
       "Type": "Task",
-      "Next": "tag-restored-efs-final",
+      "Next": "POST-RESTORE",
       "Parameters": {
         "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
       },
@@ -204,27 +216,117 @@
         }
       ]
     },
-    "tag-restored-efs-final": {
+    "POST-RESTORE": {
+      "Type": "Pass",
+      "Next": "create-efs-access-point"
+    },
+    "create-efs-access-point": {
       "Type": "Task",
-      "Next": "update-dynamodb",
+      "Next": "map-create-mount-target",
       "Parameters": {
-        "ResourceId.$": "$.get-restore-status-result.CreatedResourceArn",
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value.$": "$.TmpEFSName"
-          }
-        ]
+        "ClientToken.$": "States.UUID()",
+        "FileSystemId.$": "$.get-restore-status-result.CreatedResourceArn"
       },
-      "Resource": "arn:aws:states:::aws-sdk:efs:tagResource",
-      "ResultPath": "$.tag-restored-efs-final-result",
+      "Resource": "arn:aws:states:::aws-sdk:efs:createAccessPoint",
+      "ResultPath": "$.create-efs-access-point-result"
+    },
+    "map-create-mount-target": {
+      "Type": "Map",
+      "ItemsPath": "$.SubnetsIDs",
+      "ItemSelector": {
+        "FileSystemId.$": "$.get-restore-status-result.CreatedResourceArn",
+        "SubnetId.$": "$$.Map.Item.Value.Key",
+        "SecurityGroupID.$": "$.SecurityGroupID"
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "create-mount-target",
+        "States": {
+          "create-mount-target": {
+            "Type": "Task",
+            "Parameters": {
+              "FileSystemId.$": "$.FileSystemId",
+              "SubnetId.$": "$.SubnetId",
+              "SecurityGroups.$": "$.SecurityGroupID"
+            },
+            "Resource": "arn:aws:states:::aws-sdk:efs:createMountTarget",
+            "End": true
+          }
+        }
+      },
+      "ResultPath": "$.map-create-mount-target-result",
+      "Next": "update-lambda-efs-function",
       "Catch": [
         {
           "ErrorEquals": [
             "States.Runtime",
             "States.TaskFailed"
           ],
-          "ResultPath": "$.tag-restored-efs-final-errormsg",
+          "ResultPath": "$.delete-old-efs-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "update-lambda-efs-function": {
+      "Type": "Task",
+      "Next": "get-efs-restore-backup-directory",
+      "Parameters": {
+        "FunctionName.$": "$.LambdaEfsFunction",
+        "FileSystemConfigs": [
+          {
+            "Arn.$": "$.create-efs-access-point-result.AccessPointArn",
+            "LocalMountPath": "/mnt/efs"
+          }
+        ]
+      },
+      "Resource": "arn:aws:states:::aws-sdk:lambda:updateFunctionConfiguration",
+      "ResultPath": "$.update-lambda-efs-function-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.delete-old-efs-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "get-efs-restore-backup-directory": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "FunctionName.$": "$.LambdaEfsFunction",
+        "Payload": {
+          "EFSArn.$": "$.get-restore-status-result.CreatedResourceArn",
+          "LocalMountPath": "/mnt/efs"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "update-dynamodb",
+      "ResultPath": "$.get-efs-restore-backup-directory-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.delete-old-efs-errormsg",
           "Next": "update-dynamodb-failure"
         }
       ]
@@ -242,10 +344,10 @@
             "S.$": "$.TagEnvironment"
           },
           "instance": {
-            "S.$": "$.EFSName"
+            "S.$": "$.EfsId"
           },
           "source": {
-            "S.$": "$.SourceEFSName"
+            "S.$": "$.SourceEFSId"
           },
           "restoretype": {
             "S": "restore-efs-backup"
@@ -301,10 +403,10 @@
             "S.$": "$.TagEnvironment"
           },
           "instance": {
-            "S.$": "$.EFSName"
+            "S.$": "$.EfsId"
           },
           "source": {
-            "S.$": "$.SourceEFSName"
+            "S.$": "$.SourceEFSId"
           },
           "restoretype": {
             "S": "restore-efs-backup"
