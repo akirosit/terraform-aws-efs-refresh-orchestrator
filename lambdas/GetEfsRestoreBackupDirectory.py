@@ -16,9 +16,12 @@ def lambda_handler(event, context):
         items = os.listdir('/mnt/efs/')
         backup_dir_items = []
         for item in items:
-            if os.path.isdir(item):
-                if item.startswith("aws-backup-restore_"):
-                    backup_dir_items.append(item)
+            logger.info("Item {} isdir {}".format(item,os.path.isdir(item)))
+            if item.startswith("aws-backup-restore_"):
+                backup_dir_items.append(item)
+    except FileNotFoundError as error:
+        logger.error(str(error))
+        raise FileNotFoundError("EFS not found")
     except Exception as error:
         logger.info("Scripts run with errors. Unknow error")
         logger.error(str(error))
