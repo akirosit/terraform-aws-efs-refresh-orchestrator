@@ -1,5 +1,29 @@
 # Purpose: This file is used to create IAM policy documents for the lambda role and step function role.
 
+data "aws_ssm_parameter" "efs_id" {
+  count = var.store_efs_metadata_in_ssm ? 1 : 0
+  name  = var.efs_id_ssm_parameter_name
+}
+
+data "aws_ssm_parameter" "efs_sub_path" {
+  count = var.store_efs_metadata_in_ssm ? 1 : 0
+  name  = var.efs_sub_path_ssm_parameter_name
+}
+
+data "aws_iam_policy_document" "step_function_parameter_store" {
+  count = var.store_efs_metadata_in_ssm ? 1 : 0
+  statement {
+    effect = "Allow"
+    actions = [
+      "ssm:PutParameter"
+    ]
+    resources = [
+      data.aws_ssm_parameter.efs_id[0].arn,
+      data.aws_ssm_parameter.efs_sub_path[0].arn
+    ]
+  }
+}
+
 #
 # Step Function IAM Policy Document
 #
@@ -55,7 +79,11 @@ data "aws_iam_policy_document" "step_function_role" {
       "elasticfilesystem:DescribeMountTargets",
       "elasticfilesystem:ListTagsForResource",
       "elasticfilesystem:TagResource",
-      "elasticfilesystem:CreateAccessPoint"
+      "elasticfilesystem:CreateAccessPoint",
+      "elasticfilesystem:DescribeAccessPoints",
+      "elasticfilesystem:DeleteAccessPoint",
+      "elasticfilesystem:DescribeMountTargetSecurityGroups",
+      "elasticfilesystem:ModifyMountTargetSecurityGroups"
     ]
     resources = ["*"]
   }
@@ -64,7 +92,8 @@ data "aws_iam_policy_document" "step_function_role" {
     actions = [
       "ec2:DescribeSubnets",
       "ec2:DescribeNetworkInterfaces",
-      "ec2:CreateNetworkInterface"
+      "ec2:CreateNetworkInterface",
+      "ec2:ModifyNetworkInterfaceAttribute"
     ]
     resources = ["*"]
   }
@@ -73,6 +102,7 @@ data "aws_iam_policy_document" "step_function_role" {
     actions = [
       "lambda:InvokeFunction",
       "lambda:InvokeAsync",
+      "lambda:GetFunctionConfiguration",
       "lambda:UpdateFunctionConfiguration"
     ]
     resources = [for lambda in aws_lambda_function.functions : lambda.arn]

@@ -8,12 +8,12 @@ variable "private_subnets_ids" {
 }
 
 variable "source_efs_id" {
-  description = "The source EFS ID to be refreshed"
+  description = "The source EFS ID"
   type        = string
 }
 
 variable "efs_id" {
-  description = "The EFS name to be refreshed"
+  description = "The EFS id to be refreshed"
   type        = string
 }
 
@@ -44,6 +44,20 @@ variable "kms_key_id" {
   default     = null
 }
 
+variable "store_efs_metadata_in_ssm" {
+  description = "Store EFS ID and sub path in SSM"
+  type        = bool
+  default     = false
+}
+variable "efs_id_ssm_parameter_name" {
+  description = "SSM parameter name to store the EFS ID"
+  type        = string
+}
+
+variable "efs_sub_path_ssm_parameter_name" {
+  description = "SSM parameter name to store the EFS sub path"
+  type        = string
+}
 
 variable "sns_topic_arn" {
   description = "Existing SNS topic ARN to send notifications"

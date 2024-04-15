@@ -2,21 +2,27 @@
 
 locals {
   step_function_input = {
-    AppName           = var.app_name
-    EnvName           = var.env_name
-    SourceEFSId       = var.source_efs_id
-    EFSId             = var.efs_id
-    DeleteOldEfs      = var.delete_old_efs
-    AWSBackupRoleArn  = local.aws_backup_arn
-    ItemsToRestore    = jsonencode(var.items_to_restore)
-    LambdaEfsFunction = aws_lambda_function.functions["GetEfsRestoreBackupDirectory"].function_name
-    SubnetIDs         = jsonencode(var.private_subnets_ids)
-    SecurityGroupID   = jsonencode([var.efs_sg_id])
-    Encrypted         = var.encrypted
-    KmsKeyId          = var.kms_key_id == null ? "" : var.kms_key_id
-    DynamoDBTable     = aws_dynamodb_table.dynamodbTable.name
-    SnsTopicArn       = local.sns_topic_arn
-    Tags              = jsonencode(var.tags)
+    AppName                    = var.app_name
+    EnvName                    = var.env_name
+    SourceEFSId                = var.source_efs_id
+    EFSId                      = var.efs_id
+    DeleteOldEfs               = var.delete_old_efs
+    AWSBackupRoleArn           = local.aws_backup_arn
+    ItemsToRestore             = jsonencode(var.items_to_restore)
+    StoreEfsMetadataInSSM      = var.store_efs_metadata_in_ssm
+    EfsIdSSMParameterName      = var.efs_id_ssm_parameter_name
+    EfsSubPathSSMParameterName = var.efs_sub_path_ssm_parameter_name
+    LambdaEfsFunction          = aws_lambda_function.functions["GetEfsRestoreBackupDirectory"].function_name
+    SubnetIDs                  = jsonencode(var.private_subnets_ids)
+    SecurityGroupID = jsonencode([
+      var.efs_sg_id,
+      aws_security_group.lambda.id
+    ])
+    Encrypted     = var.encrypted
+    KmsKeyId      = var.kms_key_id == null ? "" : var.kms_key_id
+    DynamoDBTable = aws_dynamodb_table.dynamodbTable.name
+    SnsTopicArn   = local.sns_topic_arn
+    Tags          = jsonencode(var.tags)
   }
 }
 
