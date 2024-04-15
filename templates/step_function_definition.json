@@ -96,11 +96,10 @@
       "Catch": [
         {
           "ErrorEquals": [
-            "States.Runtime",
-            "States.TaskFailed"
+            "States.ALL"
           ],
           "ResultPath": "$.start-restore-job-errormsg",
-          "Next": "update-dynamodb-failure"
+          "Next": "wait-restore-done"
         }
       ]
     },
@@ -110,15 +109,25 @@
         {
           "Variable": "$.get-restore-status-result.Status",
           "StringEquals": "COMPLETED",
-          "Next": "tag-restored-efs"
+          "Next": "transform-restore-status-result"
         }
       ],
       "Default": "wait-restore-done"
     },
+    "transform-restore-status-result": {
+      "Type": "Pass",
+      "Next": "tag-restored-efs",
+      "Parameters": {
+        "FileSystemArn.$": "$.get-restore-status-result.CreatedResourceArn",
+        "FileSystemId.$": "States.ArrayGetItem(States.StringSplit($['get-restore-status-result']['CreatedResourceArn'], '/'),1)",
+        "Status.$": "$.get-restore-status-result.Status"
+      },
+      "ResultPath": "$.get-restore-status-result"
+    },
     "tag-restored-efs": {
       "Type": "Task",
       "Parameters": {
-        "ResourceARNList.$": "States.Array($['get-restore-status-result']['CreatedResourceArn'])",
+        "ResourceARNList.$": "States.Array($['get-restore-status-result']['FileSystemArn'])",
         "Tags.$": "$.allTags.Tags"
       },
       "Resource": "arn:aws:states:::aws-sdk:resourcegroupstaggingapi:tagResources",
@@ -155,7 +164,7 @@
       "Type": "Task",
       "Next": "check-efs-to-replace-tags",
       "Parameters": {
-        "CreationToken.$": "$.CreationToken"
+        "FileSystemId.$": "$.SourceEFSId"
       },
       "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
       "ResultSelector": {
@@ -222,22 +231,69 @@
     },
     "create-efs-access-point": {
       "Type": "Task",
-      "Next": "map-create-mount-target",
+      "Next": "wait-efs-access-point",
       "Parameters": {
         "ClientToken.$": "States.UUID()",
-        "FileSystemId.$": "$.get-restore-status-result.CreatedResourceArn"
+        "FileSystemId.$": "$.get-restore-status-result.FileSystemId"
       },
       "Resource": "arn:aws:states:::aws-sdk:efs:createAccessPoint",
       "ResultPath": "$.create-efs-access-point-result"
     },
+    "wait-efs-access-point": {
+      "Type": "Wait",
+      "Seconds": 1,
+      "Next": "get-efs-access-point"
+    },
+    "get-efs-access-point": {
+      "Type": "Task",
+      "Next": "outcome-efs-access-point",
+      "Parameters": {
+        "AccessPointId.$": "$.create-efs-access-point-result.AccessPointId"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:describeAccessPoints",
+      "ResultPath": "$.get-efs-access-point-result",
+      "ResultSelector": {
+        "AccessPoint.$": "$.AccessPoints[0]"
+      }
+    },
+    "outcome-efs-access-point": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.get-efs-access-point-result.AccessPoint.LifeCycleState",
+          "StringEquals": "available",
+          "Next": "get-mount-targets"
+        },
+        {
+          "Variable": "$.get-efs-access-point-result.AccessPoint.LifeCycleState",
+          "StringEquals": "creating",
+          "Next": "wait-efs-access-point"
+        }
+      ],
+      "Default": "update-dynamodb-failure"
+    },
+    "get-mount-targets": {
+      "Type": "Task",
+      "Next": "outcome-get-mount-targets",
+      "Parameters": {
+        "AccessPointId.$": "$.get-efs-access-point-result.AccessPoint.AccessPointId"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:describeMountTargets",
+      "ResultPath": "$.get-mount-targets-result"
+    },
+    "outcome-get-mount-targets": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.get-mount-targets-result.MountTargets[0]",
+          "IsPresent": true,
+          "Next": "map-create-mount-target"
+        }
+      ],
+      "Default": "map-update-mount-target"
+    },
     "map-create-mount-target": {
       "Type": "Map",
-      "ItemsPath": "$.SubnetsIDs",
-      "ItemSelector": {
-        "FileSystemId.$": "$.get-restore-status-result.CreatedResourceArn",
-        "SubnetId.$": "$$.Map.Item.Value.Key",
-        "SecurityGroupID.$": "$.SecurityGroupID"
-      },
       "ItemProcessor": {
         "ProcessorConfig": {
           "Mode": "INLINE"
@@ -246,13 +302,68 @@
         "States": {
           "create-mount-target": {
             "Type": "Task",
+            "End": true,
             "Parameters": {
               "FileSystemId.$": "$.FileSystemId",
               "SubnetId.$": "$.SubnetId",
-              "SecurityGroups.$": "$.SecurityGroupID"
+              "SecurityGroups.$": "$.SecurityGroups"
             },
-            "Resource": "arn:aws:states:::aws-sdk:efs:createMountTarget",
-            "End": true
+            "Resource": "arn:aws:states:::aws-sdk:efs:createMountTarget"
+          }
+        }
+      },
+      "Next": "update-lambda-efs-function",
+      "ItemsPath": "$.SubnetIDs",
+      "ItemSelector": {
+        "FileSystemId.$": "$.get-restore-status-result.FileSystemId",
+        "SubnetId.$": "$$.Map.Item",
+        "SecurityGroups.$": "$.SecurityGroupID"
+      },
+      "ResultPath": "$.map-create-mount-target-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.map-create-mount-target-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "map-update-mount-target": {
+      "Type": "Map",
+      "ItemsPath": "$.get-mount-targets-result.MountTargets",
+      "ItemSelector": {
+        "FileSystemId.$": "$.get-restore-status-result.FileSystemId",
+        "AccessPointId.$": "$.get-efs-access-point-result.AccessPoint.AccessPointId",
+        "MountTargetId.$": "$$.Map.Item.Value.MountTargetId",
+        "SubnetId.$": "$$.Map.Item.Value.SubnetId",
+        "SecurityGroupID.$": "$.SecurityGroupID"
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "get-mount-target-sg",
+        "States": {
+          "get-mount-target-sg": {
+            "Type": "Task",
+            "Next": "update-mount-target-sg",
+            "Parameters": {
+              "MountTargetId.$": "$.MountTargetId"
+            },
+            "Resource": "arn:aws:states:::aws-sdk:efs:describeMountTargetSecurityGroups",
+            "ResultPath": "$.get-mount-target-sg-result"
+          },
+          "update-mount-target-sg": {
+            "Type": "Task",
+            "End": true,
+            "Parameters": {
+              "MountTargetId.$": "$.MountTargetId",
+              "SecurityGroups.$": "States.StringToJson(States.Format('[{},{}]', States.ArrayGetItem(States.StringSplit(States.JsonToString($['get-mount-target-sg-result']['SecurityGroups']), '[]'),0), States.ArrayGetItem(States.StringSplit(States.JsonToString($['SecurityGroupID']), '[]'),0)))"
+            },
+            "Resource": "arn:aws:states:::aws-sdk:efs:modifyMountTargetSecurityGroups"
           }
         }
       },
@@ -264,14 +375,14 @@
             "States.Runtime",
             "States.TaskFailed"
           ],
-          "ResultPath": "$.delete-old-efs-errormsg",
+          "ResultPath": "$.map-create-mount-target-errormsg",
           "Next": "update-dynamodb-failure"
         }
       ]
     },
     "update-lambda-efs-function": {
       "Type": "Task",
-      "Next": "get-efs-restore-backup-directory",
+      "Next": "get-lambda-config",
       "Parameters": {
         "FunctionName.$": "$.LambdaEfsFunction",
         "FileSystemConfigs": [
@@ -294,42 +405,93 @@
         }
       ]
     },
+    "get-lambda-config": {
+      "Type": "Task",
+      "Next": "get-efs-restore-backup-directory",
+      "Parameters": {
+        "FunctionName.$": "$.LambdaEfsFunction"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:lambda:getFunctionConfiguration",
+      "ResultPath": "$.get-lambda-config-output"
+    },
     "get-efs-restore-backup-directory": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
-      "OutputPath": "$.Payload",
       "Parameters": {
         "FunctionName.$": "$.LambdaEfsFunction",
         "Payload": {
-          "EFSArn.$": "$.get-restore-status-result.CreatedResourceArn",
+          "EFSArn.$": "$.get-restore-status-result.FileSystemArn",
           "LocalMountPath": "/mnt/efs"
         }
       },
       "Retry": [
         {
           "ErrorEquals": [
-            "Lambda.ServiceException",
-            "Lambda.AWSLambdaException",
-            "Lambda.SdkClientException",
-            "Lambda.TooManyRequestsException"
+            "Lambda.EFSMountFailureException",
+            "FileNotFoundError"
           ],
-          "IntervalSeconds": 1,
-          "MaxAttempts": 3,
+          "IntervalSeconds": 5,
+          "MaxAttempts": 5,
           "BackoffRate": 2
         }
       ],
-      "Next": "update-dynamodb",
+      "Next": "choice-store-efs-metadata-in-ssm-parameter-store",
       "ResultPath": "$.get-efs-restore-backup-directory-result",
+      "ResultSelector": {
+        "EfsRestoreDir.$": "States.StringToJson($.Payload.body)"
+      },
       "Catch": [
         {
           "ErrorEquals": [
             "States.Runtime",
             "States.TaskFailed"
           ],
-          "ResultPath": "$.delete-old-efs-errormsg",
+          "ResultPath": "$.get-efs-restore-backup-directory-errormsg",
           "Next": "update-dynamodb-failure"
         }
       ]
+    },
+    "choice-store-efs-metadata-in-ssm-parameter-store": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.StoreEfsMetadataInSSM",
+          "BooleanEquals": true,
+          "Next": "update-efs-id-ssm-parameter"
+        }
+      ],
+      "Default": "update-dynamodb"
+    },
+    "update-efs-id-ssm-parameter": {
+      "Type": "Task",
+      "Next": "update-efs-sub-path-ssm-parameter",
+      "Parameters": {
+        "Name.$": "$.EfsIdSSMParameterName",
+        "Value.$": "$.get-restore-status-result.FileSystemId",
+        "Overwrite": true
+      },
+      "Resource": "arn:aws:states:::aws-sdk:ssm:putParameter",
+      "ResultPath": "$.update-efs-id-ssm-parameter-result"
+    },
+    "update-efs-sub-path-ssm-parameter": {
+      "Type": "Task",
+      "Next": "delete-access-point",
+      "Parameters": {
+        "Name.$": "$.EfsSubPathSSMParameterName",
+        "Value.$": "States.ArrayGetItem($['get-efs-restore-backup-directory-result']['EfsRestoreDir'],0)",
+        "Overwrite": true
+      },
+      "Resource": "arn:aws:states:::aws-sdk:ssm:putParameter",
+      "ResultPath": "$.update-efs-sub-path-ssm-parameter"
+    },
+    "delete-access-point": {
+      "Type": "Task",
+      "Next": "update-dynamodb",
+      "Parameters": {
+        "AccessPointId.$": "$.create-efs-access-point-result.AccessPointId"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:deleteAccessPoint",
+      "ResultPath": "$.delete-access-point-result"
     },
     "update-dynamodb": {
       "Type": "Task",
@@ -344,7 +506,7 @@
             "S.$": "$.TagEnvironment"
           },
           "instance": {
-            "S.$": "$.EfsId"
+            "S.$": "$.EFSId"
           },
           "source": {
             "S.$": "$.SourceEFSId"
@@ -403,7 +565,7 @@
             "S.$": "$.TagEnvironment"
           },
           "instance": {
-            "S.$": "$.EfsId"
+            "S.$": "$.EFSId"
           },
           "source": {
             "S.$": "$.SourceEFSId"
