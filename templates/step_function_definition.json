@@ -304,9 +304,9 @@
             "Type": "Task",
             "End": true,
             "Parameters": {
-              "FileSystemId.$": "$.FileSystemId",
-              "SubnetId.$": "$.SubnetId",
-              "SecurityGroups.$": "$.SecurityGroups"
+              "FileSystemId.$": "$.get-restore-status-result.FileSystemId",
+              "SubnetId.$": "$$.Map.Item",
+              "SecurityGroups.$": "$.SecurityGroupID"
             },
             "Resource": "arn:aws:states:::aws-sdk:efs:createMountTarget"
           }
@@ -315,21 +315,10 @@
       "Next": "update-lambda-efs-function",
       "ItemsPath": "$.SubnetIDs",
       "ItemSelector": {
-        "FileSystemId.$": "$.get-restore-status-result.FileSystemId",
-        "SubnetId.$": "$$.Map.Item",
-        "SecurityGroups.$": "$.SecurityGroupID"
+        "FileSystemId": "MyData",
+        "SubnetId": "MyData"
       },
-      "ResultPath": "$.map-create-mount-target-result",
-      "Catch": [
-        {
-          "ErrorEquals": [
-            "States.Runtime",
-            "States.TaskFailed"
-          ],
-          "ResultPath": "$.map-create-mount-target-errormsg",
-          "Next": "update-dynamodb-failure"
-        }
-      ]
+      "ResultPath": "$.map-create-mount-target-result"
     },
     "map-update-mount-target": {
       "Type": "Map",
