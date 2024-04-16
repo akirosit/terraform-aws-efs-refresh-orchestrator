@@ -312,6 +312,16 @@
           "ResultPath": "$.delete-old-efs-errormsg",
           "Next": "update-dynamodb-failure"
         }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 300,
+          "MaxAttempts": 3
+        }
       ]
     },
     "get-lambda-config": {
@@ -552,6 +562,16 @@
           ],
           "ResultPath": "$.delete-old-efs-errormsg",
           "Next": "update-dynamodb-failure"
+        }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Efs.FileSystemInUseException"
+          ],
+          "BackoffRate": 2,
+          "IntervalSeconds": 10,
+          "MaxAttempts": 3
         }
       ]
     },
