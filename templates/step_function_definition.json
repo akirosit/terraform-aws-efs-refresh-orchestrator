@@ -142,135 +142,7 @@
           "Next": "update-dynamodb-failure"
         }
       ],
-      "Next": "choice-delete-old-efs"
-    },
-    "choice-delete-old-efs": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.DeleteOldEfs",
-          "BooleanEquals": true,
-          "Next": "DELETE-OLD-EFS"
-        }
-      ],
-      "Default": "POST-RESTORE"
-    },
-    "DELETE-OLD-EFS": {
-      "Comment": "Post-restore steps",
-      "Type": "Pass",
-      "Next": "get-old-efs-arn"
-    },
-    "get-old-efs-arn": {
-      "Type": "Task",
-      "Next": "check-efs-to-replace-tags",
-      "Parameters": {
-        "FileSystemId.$": "$.EFSId"
-      },
-      "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
-      "ResultSelector": {
-        "FileSystemArn.$": "$.FileSystems[0].FileSystemArn",
-        "FileSystemId.$": "$.FileSystems[0].FileSystemId"
-      },
-      "ResultPath": "$.get-old-efs-arn-result"
-    },
-    "check-efs-to-replace-tags": {
-      "Type": "Task",
-      "Next": "outcome-check-efs-to-replace-tags",
-      "Resource": "arn:aws:states:::aws-sdk:efs:listTagsForResource",
-      "Parameters": {
-        "ResourceId.$": "$.get-old-efs-arn-result.FileSystemArn"
-      },
-      "ResultSelector": {
-        "TagRefresh.$": "States.ArrayGetItem($.Tags[?(@.Key=='refresh')].Value,0)"
-      },
-      "ResultPath": "$.check-efs-to-replace-tags-result",
-      "Catch": [
-        {
-          "ErrorEquals": [
-            "States.Runtime",
-            "States.TaskFailed"
-          ],
-          "ResultPath": "$.check-efs-to-replace-tags-errormsg",
-          "Next": "update-dynamodb-failure"
-        }
-      ]
-    },
-    "outcome-check-efs-to-replace-tags": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.check-efs-to-replace-tags-result.TagRefresh",
-          "StringEquals": "true",
-          "Next": "get-mount-targets-old-efs"
-        }
-      ],
-      "Default": "update-dynamodb-failure"
-    },
-    "get-mount-targets-old-efs": {
-      "Type": "Task",
-      "Next": "map-delete-mount-target",
-      "Parameters": {
-        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
-      },
-      "Resource": "arn:aws:states:::aws-sdk:efs:describeMountTargets",
-      "ResultPath": "$.get-mount-targets-result-old-efs"
-    },
-    "map-delete-mount-target": {
-      "Type": "Map",
-      "ItemsPath": "$.get-mount-targets-result-old-efs.MountTargets",
-      "ItemSelector": {
-        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId",
-        "MountTargetId.$": "$$.Map.Item.Value.MountTargetId",
-        "SubnetId.$": "$$.Map.Item.Value.SubnetId"
-      },
-      "ItemProcessor": {
-        "ProcessorConfig": {
-          "Mode": "INLINE"
-        },
-        "StartAt": "delete-mount-target",
-        "States": {
-          "delete-mount-target": {
-            "Type": "Task",
-            "Parameters": {
-              "MountTargetId.$": "$.MountTargetId"
-            },
-            "Resource": "arn:aws:states:::aws-sdk:efs:deleteMountTarget",
-            "ResultPath": "$.get-mount-target-sg-result",
-            "End": true
-          }
-        }
-      },
-      "ResultPath": "$.map-delete-mount-target-result",
-      "Next": "delete-old-efs",
-      "Catch": [
-        {
-          "ErrorEquals": [
-            "States.Runtime",
-            "States.TaskFailed"
-          ],
-          "ResultPath": "$.map-delete-mount-target-errormsg",
-          "Next": "update-dynamodb-failure"
-        }
-      ]
-    },
-    "delete-old-efs": {
-      "Type": "Task",
-      "Next": "POST-RESTORE",
-      "Parameters": {
-        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
-      },
-      "Resource": "arn:aws:states:::aws-sdk:efs:deleteFileSystem",
-      "ResultPath": "$.delete-old-efs-result",
-      "Catch": [
-        {
-          "ErrorEquals": [
-            "States.Runtime",
-            "States.TaskFailed"
-          ],
-          "ResultPath": "$.delete-old-efs-errormsg",
-          "Next": "update-dynamodb-failure"
-        }
-      ]
+      "Next": "POST-RESTORE"
     },
     "POST-RESTORE": {
       "Type": "Pass",
@@ -497,7 +369,7 @@
           "Next": "update-efs-id-ssm-parameter"
         }
       ],
-      "Default": "update-dynamodb"
+      "Default": "choice-delete-old-efs"
     },
     "update-efs-id-ssm-parameter": {
       "Type": "Task",
@@ -523,12 +395,165 @@
     },
     "delete-access-point": {
       "Type": "Task",
-      "Next": "update-dynamodb",
+      "Next": "choice-delete-old-efs",
       "Parameters": {
         "AccessPointId.$": "$.create-efs-access-point-result.AccessPointId"
       },
       "Resource": "arn:aws:states:::aws-sdk:efs:deleteAccessPoint",
       "ResultPath": "$.delete-access-point-result"
+    },
+    "choice-delete-old-efs": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.DeleteOldEfs",
+          "BooleanEquals": true,
+          "Next": "DELETE-OLD-EFS"
+        }
+      ],
+      "Default": "POST-RESTORE"
+    },
+    "DELETE-OLD-EFS": {
+      "Comment": "Post-restore steps",
+      "Type": "Pass",
+      "Next": "get-old-efs-arn"
+    },
+    "get-old-efs-arn": {
+      "Type": "Task",
+      "Next": "check-efs-to-replace-tags",
+      "Parameters": {
+        "FileSystemId.$": "$.EFSId"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
+      "ResultSelector": {
+        "FileSystemArn.$": "$.FileSystems[0].FileSystemArn",
+        "FileSystemId.$": "$.FileSystems[0].FileSystemId"
+      },
+      "ResultPath": "$.get-old-efs-arn-result"
+    },
+    "check-efs-to-replace-tags": {
+      "Type": "Task",
+      "Next": "outcome-check-efs-to-replace-tags",
+      "Resource": "arn:aws:states:::aws-sdk:efs:listTagsForResource",
+      "Parameters": {
+        "ResourceId.$": "$.get-old-efs-arn-result.FileSystemArn"
+      },
+      "ResultSelector": {
+        "TagRefresh.$": "States.ArrayGetItem($.Tags[?(@.Key=='refresh')].Value,0)"
+      },
+      "ResultPath": "$.check-efs-to-replace-tags-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.check-efs-to-replace-tags-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "outcome-check-efs-to-replace-tags": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.check-efs-to-replace-tags-result.TagRefresh",
+          "StringEquals": "true",
+          "Next": "get-mount-targets-old-efs"
+        }
+      ],
+      "Default": "update-dynamodb-failure"
+    },
+    "get-mount-targets-old-efs": {
+      "Type": "Task",
+      "Next": "map-delete-mount-target",
+      "Parameters": {
+        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:describeMountTargets",
+      "ResultPath": "$.get-mount-targets-result-old-efs"
+    },
+    "map-delete-mount-target": {
+      "Type": "Map",
+      "ItemsPath": "$.get-mount-targets-result-old-efs.MountTargets",
+      "ItemSelector": {
+        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId",
+        "MountTargetId.$": "$$.Map.Item.Value.MountTargetId",
+        "SubnetId.$": "$$.Map.Item.Value.SubnetId"
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "delete-mount-target",
+        "States": {
+          "delete-mount-target": {
+            "Type": "Task",
+            "Parameters": {
+              "MountTargetId.$": "$.MountTargetId"
+            },
+            "Resource": "arn:aws:states:::aws-sdk:efs:deleteMountTarget",
+            "ResultPath": "$.get-mount-target-sg-result",
+            "End": true
+          }
+        }
+      },
+      "ResultPath": "$.map-delete-mount-target-result",
+      "Next": "wait-delete-efs-mount-target",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.map-delete-mount-target-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
+    },
+    "wait-delete-efs-mount-target": {
+      "Type": "Wait",
+      "Seconds": 1,
+      "Next": "get-mount-targets-old-efs-after-delete"
+    },
+    "get-mount-targets-old-efs-after-delete": {
+      "Type": "Task",
+      "Next": "outcome-delete-efs-mount-target",
+      "Parameters": {
+        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:describeMountTargets",
+      "ResultPath": "$.get-mount-targets-result-old-efs-after-delete"
+    },
+    "outcome-delete-efs-mount-target": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.get-mount-targets-result.MountTargets[0]",
+          "IsPresent": true,
+          "Next": "wait-delete-efs-mount-target"
+        }
+      ],
+      "Default": "delete-old-efs"
+    },
+    "delete-old-efs": {
+      "Type": "Task",
+      "Next": "update-dynamodb",
+      "Parameters": {
+        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:deleteFileSystem",
+      "ResultPath": "$.delete-old-efs-result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.delete-old-efs-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
     },
     "update-dynamodb": {
       "Type": "Task",
