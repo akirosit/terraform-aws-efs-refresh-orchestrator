@@ -164,7 +164,7 @@
       "Type": "Task",
       "Next": "check-efs-to-replace-tags",
       "Parameters": {
-        "FileSystemId.$": "$.SourceEFSId"
+        "FileSystemId.$": "$.EFSId"
       },
       "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
       "ResultSelector": {
@@ -201,10 +201,57 @@
         {
           "Variable": "$.check-efs-to-replace-tags-result.TagRefresh",
           "StringEquals": "true",
-          "Next": "delete-old-efs"
+          "Next": "get-mount-targets-old-efs"
         }
       ],
       "Default": "update-dynamodb-failure"
+    },
+    "get-mount-targets-old-efs": {
+      "Type": "Task",
+      "Next": "map-delete-mount-target",
+      "Parameters": {
+        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:describeMountTargets",
+      "ResultPath": "$.get-mount-targets-result-old-efs"
+    },
+    "map-delete-mount-target": {
+      "Type": "Map",
+      "ItemsPath": "$.get-mount-targets-result-old-efs.MountTargets",
+      "ItemSelector": {
+        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId",
+        "MountTargetId.$": "$$.Map.Item.Value.MountTargetId",
+        "SubnetId.$": "$$.Map.Item.Value.SubnetId"
+      },
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "delete-mount-target",
+        "States": {
+          "delete-mount-target": {
+            "Type": "Task",
+            "Parameters": {
+              "MountTargetId.$": "$.MountTargetId"
+            },
+            "Resource": "arn:aws:states:::aws-sdk:efs:deleteMountTarget",
+            "ResultPath": "$.get-mount-target-sg-result",
+            "End": true
+          }
+        }
+      },
+      "ResultPath": "$.map-delete-mount-target-result",
+      "Next": "delete-old-efs",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.Runtime",
+            "States.TaskFailed"
+          ],
+          "ResultPath": "$.map-delete-mount-target-errormsg",
+          "Next": "update-dynamodb-failure"
+        }
+      ]
     },
     "delete-old-efs": {
       "Type": "Task",
@@ -287,10 +334,10 @@
         {
           "Variable": "$.get-mount-targets-result.MountTargets[0]",
           "IsPresent": true,
-          "Next": "map-create-mount-target"
+          "Next": "map-update-mount-target"
         }
       ],
-      "Default": "map-update-mount-target"
+      "Default": "map-create-mount-target"
     },
     "map-create-mount-target": {
       "Type": "Map",
@@ -304,9 +351,9 @@
             "Type": "Task",
             "End": true,
             "Parameters": {
-              "FileSystemId.$": "$.get-restore-status-result.FileSystemId",
-              "SubnetId.$": "$$.Map.Item",
-              "SecurityGroups.$": "$.SecurityGroupID"
+              "FileSystemId.$": "$.FileSystemId",
+              "SubnetId.$": "$.SubnetId",
+              "SecurityGroups.$": "$.SecurityGroups"
             },
             "Resource": "arn:aws:states:::aws-sdk:efs:createMountTarget"
           }
@@ -315,8 +362,9 @@
       "Next": "update-lambda-efs-function",
       "ItemsPath": "$.SubnetIDs",
       "ItemSelector": {
-        "FileSystemId": "MyData",
-        "SubnetId": "MyData"
+        "FileSystemId.$": "$.get-restore-status-result.FileSystemId",
+        "SubnetId.$": "$$.Map.Item.Value",
+        "SecurityGroups.$": "$.SecurityGroupID"
       },
       "ResultPath": "$.map-create-mount-target-result"
     },

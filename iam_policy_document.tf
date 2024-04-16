@@ -1,5 +1,15 @@
 # Purpose: This file is used to create IAM policy documents for the lambda role and step function role.
 
+data "aws_efs_file_system" "old_efs" {
+  count          = var.delete_old_efs ? 1 : 0
+  file_system_id = var.efs_id
+}
+
+#data "aws_efs_mount_target" "old_efs" {
+#  count          = var.delete_old_efs ? 1 : 0
+#  file_system_id = var.efs_id
+#}
+
 data "aws_ssm_parameter" "efs_id" {
   count = var.store_efs_metadata_in_ssm ? 1 : 0
   name  = var.efs_id_ssm_parameter_name
@@ -20,6 +30,28 @@ data "aws_iam_policy_document" "step_function_parameter_store" {
     resources = [
       data.aws_ssm_parameter.efs_id[0].arn,
       data.aws_ssm_parameter.efs_sub_path[0].arn
+    ]
+  }
+}
+
+data "aws_iam_policy_document" "step_function_delete_old_efs" {
+  count = var.delete_old_efs ? 1 : 0
+  statement {
+    effect = "Allow"
+    actions = [
+      "elasticfilesystem:DeleteFileSystem"
+    ]
+    resources = [
+      data.aws_efs_file_system.old_efs[0].arn
+    ]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "elasticfilesystem:DeleteMountTarget"
+    ]
+    resources = [
+      "*"
     ]
   }
 }

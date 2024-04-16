@@ -35,6 +35,19 @@ resource "aws_iam_role_policy_attachment" "step_function_parameter_store" {
   policy_arn = aws_iam_policy.step_function_parameter_store[0].arn
   role       = aws_iam_role.step_function.name
 }
+
+resource "aws_iam_policy" "step_function_delete_old_efs" {
+  count  = var.delete_old_efs ? 1 : 0
+  name   = "${local.name_cc}StepFunctionDeleteOldEfs"
+  path   = "/"
+  policy = data.aws_iam_policy_document.step_function_delete_old_efs[0].json
+}
+
+resource "aws_iam_role_policy_attachment" "step_function_delete_old_efs" {
+  count      = var.delete_old_efs ? 1 : 0
+  policy_arn = aws_iam_policy.step_function_delete_old_efs[0].arn
+  role       = aws_iam_role.step_function.name
+}
 #
 # Lambda IAM Role
 #
