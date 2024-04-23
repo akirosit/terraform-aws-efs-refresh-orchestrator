@@ -10,15 +10,15 @@ data "aws_efs_file_system" "old_efs" {
 #  file_system_id = var.efs_id
 #}
 
-data "aws_ssm_parameter" "efs_id" {
-  count = var.store_efs_metadata_in_ssm ? 1 : 0
-  name  = var.efs_id_ssm_parameter_name
-}
+#data "aws_ssm_parameter" "efs_id" {
+#  count = var.store_efs_metadata_in_ssm ? 1 : 0
+#  name  = var.efs_id_ssm_parameter_name
+#}
 
-data "aws_ssm_parameter" "efs_sub_path" {
-  count = var.store_efs_metadata_in_ssm ? 1 : 0
-  name  = var.efs_sub_path_ssm_parameter_name
-}
+#data "aws_ssm_parameter" "efs_sub_path" {
+#  count = var.store_efs_metadata_in_ssm ? 1 : 0
+#  name  = var.efs_sub_path_ssm_parameter_name
+#}
 
 data "aws_iam_policy_document" "step_function_parameter_store" {
   count = var.store_efs_metadata_in_ssm ? 1 : 0
@@ -28,8 +28,9 @@ data "aws_iam_policy_document" "step_function_parameter_store" {
       "ssm:PutParameter"
     ]
     resources = [
-      data.aws_ssm_parameter.efs_id[0].arn,
-      data.aws_ssm_parameter.efs_sub_path[0].arn
+      "*"
+      #     data.aws_ssm_parameter.efs_id[0].arn,
+      #     data.aws_ssm_parameter.efs_sub_path[0].arn
     ]
   }
 }
