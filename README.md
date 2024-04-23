@@ -11,7 +11,6 @@ module "refresh_efs" {
   source = "akirosit/efs-refresh-orchestrator/aws"
 
   # Network informations
-  # (from remote state)
   vpc_id              = "vpc-XXX"
   private_subnets_ids = [ "subnet-xxx", "subnet-yyy"] # used for lambda deployment
 
