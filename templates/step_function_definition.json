@@ -387,6 +387,7 @@
       "Parameters": {
         "Name.$": "$.EfsIdSSMParameterName",
         "Value.$": "$.get-restore-status-result.FileSystemId",
+        "Type": "String",
         "Overwrite": true
       },
       "Resource": "arn:aws:states:::aws-sdk:ssm:putParameter",
@@ -398,6 +399,7 @@
       "Parameters": {
         "Name.$": "$.EfsSubPathSSMParameterName",
         "Value.$": "States.ArrayGetItem($['get-efs-restore-backup-directory-result']['EfsRestoreDir'],0)",
+        "Type": "String",
         "Overwrite": true
       },
       "Resource": "arn:aws:states:::aws-sdk:ssm:putParameter",
