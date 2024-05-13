@@ -423,7 +423,7 @@
           "Next": "DELETE-OLD-EFS"
         }
       ],
-      "Default": "POST-RESTORE"
+      "Default": "update-dynamodb"
     },
     "DELETE-OLD-EFS": {
       "Comment": "Post-restore steps",
