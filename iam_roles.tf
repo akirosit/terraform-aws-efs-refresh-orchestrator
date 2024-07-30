@@ -24,28 +24,24 @@ resource "aws_iam_role_policy_attachment" "step_function_role" {
 }
 
 resource "aws_iam_policy" "step_function_parameter_store" {
-  count  = var.store_efs_metadata_in_ssm ? 1 : 0
   name   = "${local.name_cc}StepFunctionParameterStore"
   path   = "/"
-  policy = data.aws_iam_policy_document.step_function_parameter_store[0].json
+  policy = data.aws_iam_policy_document.step_function_parameter_store.json
 }
 
 resource "aws_iam_role_policy_attachment" "step_function_parameter_store" {
-  count      = var.store_efs_metadata_in_ssm ? 1 : 0
-  policy_arn = aws_iam_policy.step_function_parameter_store[0].arn
+  policy_arn = aws_iam_policy.step_function_parameter_store.arn
   role       = aws_iam_role.step_function.name
 }
 
 resource "aws_iam_policy" "step_function_delete_old_efs" {
-  count  = var.delete_old_efs ? 1 : 0
   name   = "${local.name_cc}StepFunctionDeleteOldEfs"
   path   = "/"
-  policy = data.aws_iam_policy_document.step_function_delete_old_efs[0].json
+  policy = data.aws_iam_policy_document.step_function_delete_old_efs.json
 }
 
 resource "aws_iam_role_policy_attachment" "step_function_delete_old_efs" {
-  count      = var.delete_old_efs ? 1 : 0
-  policy_arn = aws_iam_policy.step_function_delete_old_efs[0].arn
+  policy_arn = aws_iam_policy.step_function_delete_old_efs.arn
   role       = aws_iam_role.step_function.name
 }
 #

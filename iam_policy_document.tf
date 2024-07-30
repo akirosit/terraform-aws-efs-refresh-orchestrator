@@ -1,9 +1,9 @@
 # Purpose: This file is used to create IAM policy documents for the lambda role and step function role.
 
-data "aws_efs_file_system" "old_efs" {
-  count          = var.delete_old_efs ? 1 : 0
-  file_system_id = var.efs_id
-}
+#data "aws_efs_file_system" "old_efs" {
+#  count          = var.delete_old_efs ? 1 : 0
+#  file_system_id = var.efs_id
+#}
 
 #data "aws_efs_mount_target" "old_efs" {
 #  count          = var.delete_old_efs ? 1 : 0
@@ -42,9 +42,12 @@ data "aws_iam_policy_document" "step_function_delete_old_efs" {
     actions = [
       "elasticfilesystem:DeleteFileSystem"
     ]
-    resources = [
-      data.aws_efs_file_system.old_efs[0].arn
-    ]
+    resources = ["arn:aws:elasticfilesystem:${local.current_region}:${local.current_account_id}:file-system/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/Name"
+      values   = [var.efs_name]
+    }
   }
   statement {
     effect = "Allow"
