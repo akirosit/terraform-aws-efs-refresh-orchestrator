@@ -9,7 +9,7 @@
       "Parameters": {
         "Tags": {
           "refresh": "true",
-          "refresh-efs.$": "$.SourceEFSId"
+          "refresh-efs.$": "$.SourceEFSName"
         }
       }
     },
@@ -598,10 +598,10 @@
             "S.$": "$.TagEnvironment"
           },
           "instance": {
-            "S.$": "$.EFSId"
+            "S.$": "$.EFSName"
           },
           "source": {
-            "S.$": "$.SourceEFSId"
+            "S.$": "$.SourceEFSName"
           },
           "restoretype": {
             "S": "restore-efs-backup"
@@ -657,10 +657,10 @@
             "S.$": "$.TagEnvironment"
           },
           "instance": {
-            "S.$": "$.EFSId"
+            "S.$": "$.EFSName"
           },
           "source": {
-            "S.$": "$.SourceEFSId"
+            "S.$": "$.SourceEFSName"
           },
           "restoretype": {
             "S": "restore-efs-backup"
