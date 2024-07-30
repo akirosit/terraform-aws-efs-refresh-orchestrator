@@ -36,8 +36,8 @@
       "Type": "Pass",
       "Parameters": {
         "Name.$": "$.SourceEFSName",
-        "FileSystemArn.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemArn,0)",
-        "FileSystemId.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemId,0)"
+        "FileSystemArn.$": "States.ArrayGetItem($.SourceEFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemArn,0)",
+        "FileSystemId.$": "States.ArrayGetItem($.SourceEFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemId,0)"
       },
       "ResultPath": "$.SourceEFS",
       "Next": "get-latest-recovery-point"
@@ -445,8 +445,8 @@
       "Type": "Pass",
       "Parameters": {
         "Name.$": "$.EFSName",
-        "FileSystemArn.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.EFSName)].FileSystemArn,0)",
-        "FileSystemId.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.EFSName)].FileSystemId,0)"
+        "FileSystemArn.$": "States.ArrayGetItem($.OldEFS.FileSystems[?(@.Name==$.EFSName)].FileSystemArn,0)",
+        "FileSystemId.$": "States.ArrayGetItem($.OldEFS.FileSystems[?(@.Name==$.EFSName)].FileSystemId,0)"
       },
       "ResultPath": "$.OldEFS",
       "Next": "check-efs-to-replace-tags"
