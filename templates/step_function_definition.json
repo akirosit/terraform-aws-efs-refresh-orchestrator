@@ -29,18 +29,18 @@
       "Type": "Task",
       "Parameters": {},
       "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
-      "Next": "GetEFS",
+      "Next": "get-source-efs",
       "ResultPath": "$.SourceEFS"
     },
     "get-source-efs": {
       "Type": "Pass",
-      "End": true,
       "Parameters": {
         "Name.$": "$.SourceEFSName",
         "FileSystemArn.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemArn,0)",
         "FileSystemId.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemId,0)"
       },
-      "ResultPath": "$.SourceEFS"
+      "ResultPath": "$.SourceEFS",
+      "Next": "get-latest-recovery-point"
     },
     "get-latest-recovery-point": {
       "Type": "Task",
@@ -438,18 +438,18 @@
       "Type": "Task",
       "Parameters": {},
       "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
-      "Next": "GetEFS",
+      "Next": "get-old-efs",
       "ResultPath": "$.OldEFS"
     },
     "get-old-efs": {
       "Type": "Pass",
-      "End": true,
       "Parameters": {
         "Name.$": "$.EFSName",
         "FileSystemArn.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.EFSName)].FileSystemArn,0)",
         "FileSystemId.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.EFSName)].FileSystemId,0)"
       },
-      "ResultPath": "$.OldEFS"
+      "ResultPath": "$.OldEFS",
+      "Next": "check-efs-to-replace-tags"
     },
     "check-efs-to-replace-tags": {
       "Type": "Task",
