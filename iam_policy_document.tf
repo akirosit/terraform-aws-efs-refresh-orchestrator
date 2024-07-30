@@ -21,7 +21,6 @@
 #}
 
 data "aws_iam_policy_document" "step_function_parameter_store" {
-  count = var.store_efs_metadata_in_ssm ? 1 : 0
   statement {
     effect = "Allow"
     actions = [
@@ -36,7 +35,6 @@ data "aws_iam_policy_document" "step_function_parameter_store" {
 }
 
 data "aws_iam_policy_document" "step_function_delete_old_efs" {
-  count = var.delete_old_efs ? 1 : 0
   statement {
     effect = "Allow"
     actions = [
