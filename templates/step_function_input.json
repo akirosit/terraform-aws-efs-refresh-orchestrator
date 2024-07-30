@@ -1,7 +1,7 @@
 {
     "Comment": "Input for the EFS State Machine",
-    "SourceEFSId": "${SourceEFSId}",
-    "EFSId": "${EFSId}",
+    "SourceEFSName": "${SourceEFSName}",
+    "EFSName": "${EFSName}",
     "DeleteOldEfs": ${DeleteOldEfs},
     "newFileSystem": "true",
     "AWSBackupRoleArn": "${AWSBackupRoleArn}",
@@ -17,10 +17,10 @@
     "TagEnvironment": "${EnvName}",
     "DynamoDBTableName": "${DynamoDBTable}",
     "SNSTopicArn": "${SnsTopicArn}",
-    "SNSSubject": "Application ${AppName}: restore of the EFS ${EFSId} [COMPLETED]",
-    "SNSMessage": "The restore of the database instance ${EFSId} from the source ${SourceEFSId} has been completed successfully.",
-    "SNSSubjectFailure": "Application ${AppName}: restore of the database instance ${SourceEFSId} [FAILED]",
-    "SNSMessageFailure": "The restore of the database instance ${EFSId} from the source ${SourceEFSId} has failed.",
+    "SNSSubject": "Application ${AppName}: restore of the EFS ${EFSName} [COMPLETED]",
+    "SNSMessage": "The restore of EFS ${EFSName} from the source ${SourceEFSName} has been completed successfully.",
+    "SNSSubjectFailure": "Application ${AppName}: restore of the database instance ${SourceEFSName} [FAILED]",
+    "SNSMessageFailure": "The restore of EFS instance ${EFSName} from the source ${SourceEFSName} has failed.",
     "ItemsToRestore": ${ItemsToRestore},
     "Tags": ${Tags}
 }

@@ -23,26 +23,30 @@
     },
     "RESTORE": {
       "Type": "Pass",
-      "Next": "get-source-efs-arn"
+      "Next": "get-all-source-efs"
     },
-    "get-source-efs-arn": {
+    "get-all-source-efs": {
       "Type": "Task",
-      "Next": "get-latest-recovery-point",
-      "Parameters": {
-        "FileSystemId.$": "$.SourceEFSId"
-      },
+      "Parameters": {},
       "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
-      "ResultSelector": {
-        "FileSystemArn.$": "$.FileSystems[0].FileSystemArn",
-        "FileSystemId.$": "$.FileSystems[0].FileSystemId"
+      "Next": "GetEFS",
+      "ResultPath": "$.SourceEFS"
+    },
+    "get-source-efs": {
+      "Type": "Pass",
+      "End": true,
+      "Parameters": {
+        "Name.$": "$.SourceEFSName",
+        "FileSystemArn.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemArn,0)",
+        "FileSystemId.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemId,0)"
       },
-      "ResultPath": "$.get-source-efs-arn-result"
+      "ResultPath": "$.SourceEFS"
     },
     "get-latest-recovery-point": {
       "Type": "Task",
       "Next": "start-restore-job",
       "Parameters": {
-        "ResourceArn.$": "$.get-source-efs-arn-result.FileSystemArn"
+        "ResourceArn.$": "$.SourceEFS.FileSystemArn"
       },
       "Resource": "arn:aws:states:::aws-sdk:backup:listRecoveryPointsByResource",
       "ResultPath": "$.get-latest-recovery-point",
@@ -57,7 +61,7 @@
       "Parameters": {
         "IamRoleArn.$": "$.AWSBackupRoleArn",
         "Metadata": {
-          "file-system-id.$": "$.get-source-efs-arn-result.FileSystemId",
+          "file-system-id.$": "$.SourceEFS.FileSystemId",
           "Encrypted.$": "$.Encrypted",
           "KmsKeyId.$": "$.KmsKeyId",
           "PerformanceMode": "generalPurpose",
@@ -428,27 +432,31 @@
     "DELETE-OLD-EFS": {
       "Comment": "Post-restore steps",
       "Type": "Pass",
-      "Next": "get-old-efs-arn"
+      "Next": "get-all-old-efs"
     },
-    "get-old-efs-arn": {
+    "get-all-old-efs": {
       "Type": "Task",
-      "Next": "check-efs-to-replace-tags",
-      "Parameters": {
-        "FileSystemId.$": "$.EFSId"
-      },
+      "Parameters": {},
       "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
-      "ResultSelector": {
-        "FileSystemArn.$": "$.FileSystems[0].FileSystemArn",
-        "FileSystemId.$": "$.FileSystems[0].FileSystemId"
+      "Next": "GetEFS",
+      "ResultPath": "$.OldEFS"
+    },
+    "get-old-efs": {
+      "Type": "Pass",
+      "End": true,
+      "Parameters": {
+        "Name.$": "$.EFSName",
+        "FileSystemArn.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.EFSName)].FileSystemArn,0)",
+        "FileSystemId.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.EFSName)].FileSystemId,0)"
       },
-      "ResultPath": "$.get-old-efs-arn-result"
+      "ResultPath": "$.OldEFS"
     },
     "check-efs-to-replace-tags": {
       "Type": "Task",
       "Next": "outcome-check-efs-to-replace-tags",
       "Resource": "arn:aws:states:::aws-sdk:efs:listTagsForResource",
       "Parameters": {
-        "ResourceId.$": "$.get-old-efs-arn-result.FileSystemArn"
+        "ResourceId.$": "$.OldEFS.FileSystemArn"
       },
       "ResultSelector": {
         "TagRefresh.$": "States.ArrayGetItem($.Tags[?(@.Key=='refresh')].Value,0)"
@@ -480,7 +488,7 @@
       "Type": "Task",
       "Next": "map-delete-mount-target",
       "Parameters": {
-        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
+        "FileSystemId.$": "$.OldEFS.FileSystemId"
       },
       "Resource": "arn:aws:states:::aws-sdk:efs:describeMountTargets",
       "ResultPath": "$.get-mount-targets-result-old-efs"
@@ -489,7 +497,7 @@
       "Type": "Map",
       "ItemsPath": "$.get-mount-targets-result-old-efs.MountTargets",
       "ItemSelector": {
-        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId",
+        "FileSystemId.$": "$.OldEFS.FileSystemId",
         "MountTargetId.$": "$$.Map.Item.Value.MountTargetId",
         "SubnetId.$": "$$.Map.Item.Value.SubnetId"
       },
@@ -532,7 +540,7 @@
       "Type": "Task",
       "Next": "outcome-delete-efs-mount-target",
       "Parameters": {
-        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
+        "FileSystemId.$": "$.OldEFS.FileSystemId"
       },
       "Resource": "arn:aws:states:::aws-sdk:efs:describeMountTargets",
       "ResultPath": "$.get-mount-targets-result-old-efs-after-delete"
@@ -552,7 +560,7 @@
       "Type": "Task",
       "Next": "update-dynamodb",
       "Parameters": {
-        "FileSystemId.$": "$.get-old-efs-arn-result.FileSystemId"
+        "FileSystemId.$": "$.OldEFS.FileSystemId"
       },
       "Resource": "arn:aws:states:::aws-sdk:efs:deleteFileSystem",
       "ResultPath": "$.delete-old-efs-result",
