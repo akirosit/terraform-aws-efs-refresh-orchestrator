@@ -7,13 +7,13 @@ variable "private_subnets_ids" {
   type        = list(string)
 }
 
-variable "source_efs_id" {
-  description = "The source EFS ID"
+variable "source_efs_name" {
+  description = "The source EFS Name"
   type        = string
 }
 
-variable "efs_id" {
-  description = "The EFS id to be refreshed"
+variable "efs_name" {
+  description = "The EFS name to be refreshed"
   type        = string
 }
 

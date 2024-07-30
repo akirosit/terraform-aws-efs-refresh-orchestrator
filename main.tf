@@ -4,8 +4,8 @@ locals {
   step_function_input = {
     AppName                    = var.app_name
     EnvName                    = var.env_name
-    SourceEFSId                = var.source_efs_id
-    EFSId                      = var.efs_id
+    SourceEFSName              = var.source_efs_name
+    EFSName                    = var.efs_name
     DeleteOldEfs               = var.delete_old_efs
     AWSBackupRoleArn           = local.aws_backup_arn
     ItemsToRestore             = jsonencode(var.items_to_restore)
