@@ -23,21 +23,21 @@
     },
     "RESTORE": {
       "Type": "Pass",
-      "Next": "get-all-source-efs"
+      "Next": "get-all-efs"
     },
-    "get-all-source-efs": {
+    "get-all-efs": {
       "Type": "Task",
       "Parameters": {},
       "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
       "Next": "get-source-efs",
-      "ResultPath": "$.SourceEFS"
+      "ResultPath": "$.EFS"
     },
     "get-source-efs": {
       "Type": "Pass",
       "Parameters": {
         "Name.$": "$.SourceEFSName",
-        "FileSystemArn.$": "States.ArrayGetItem($.SourceEFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemArn,0)",
-        "FileSystemId.$": "States.ArrayGetItem($.SourceEFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemId,0)"
+        "FileSystemArn.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemArn,0)",
+        "FileSystemId.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.SourceEFSName)].FileSystemId,0)"
       },
       "ResultPath": "$.SourceEFS",
       "Next": "get-latest-recovery-point"
@@ -351,10 +351,11 @@
         {
           "ErrorEquals": [
             "Lambda.EFSMountFailureException",
+            "Lambda.EFSMountConnectivityException",
             "FileNotFoundError"
           ],
           "IntervalSeconds": 5,
-          "MaxAttempts": 5,
+          "MaxAttempts": 10,
           "BackoffRate": 2
         }
       ],
@@ -432,21 +433,14 @@
     "DELETE-OLD-EFS": {
       "Comment": "Post-restore steps",
       "Type": "Pass",
-      "Next": "get-all-old-efs"
-    },
-    "get-all-old-efs": {
-      "Type": "Task",
-      "Parameters": {},
-      "Resource": "arn:aws:states:::aws-sdk:efs:describeFileSystems",
-      "Next": "get-old-efs",
-      "ResultPath": "$.OldEFS"
+      "Next": "get-old-efs"
     },
     "get-old-efs": {
       "Type": "Pass",
       "Parameters": {
         "Name.$": "$.EFSName",
-        "FileSystemArn.$": "States.ArrayGetItem($.OldEFS.FileSystems[?(@.Name==$.EFSName)].FileSystemArn,0)",
-        "FileSystemId.$": "States.ArrayGetItem($.OldEFS.FileSystems[?(@.Name==$.EFSName)].FileSystemId,0)"
+        "FileSystemArn.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.EFSName)].FileSystemArn,0)",
+        "FileSystemId.$": "States.ArrayGetItem($.EFS.FileSystems[?(@.Name==$.EFSName)].FileSystemId,0)"
       },
       "ResultPath": "$.OldEFS",
       "Next": "check-efs-to-replace-tags"
