@@ -41,11 +41,11 @@ data "aws_iam_policy_document" "step_function_delete_old_efs" {
       "elasticfilesystem:DeleteFileSystem"
     ]
     resources = ["arn:aws:elasticfilesystem:${local.current_region}:${local.current_account_id}:file-system/*"]
-    condition {
-      test     = "StringEquals"
-      variable = "aws:RequestTag/Name"
-      values   = [var.efs_name]
-    }
+    #condition {
+    #  test     = "StringEquals"
+    #  variable = "aws:RequestTag/Name"
+    #  values   = [var.efs_name]
+    #}
   }
   statement {
     effect = "Allow"
