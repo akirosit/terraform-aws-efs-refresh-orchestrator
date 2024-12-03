@@ -44,6 +44,16 @@ variable "kms_key_id" {
   default     = null
 }
 
+variable "efs_lifecycle_policies" {
+  description = "EFS lifecycle policies"
+  type = list(object({
+    TransitionToArchive             = string
+    TransitionToIA                  = string
+    TransitionToPrimaryStorageClass = string
+  }))
+  default = []
+}
+
 variable "store_efs_metadata_in_ssm" {
   description = "Store EFS ID and sub path in SSM"
   type        = bool

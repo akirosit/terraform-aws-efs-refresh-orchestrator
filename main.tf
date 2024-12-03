@@ -18,11 +18,12 @@ locals {
       var.efs_sg_id,
       aws_security_group.lambda.id
     ])
-    Encrypted     = var.encrypted
-    KmsKeyId      = var.kms_key_id == null ? "" : var.kms_key_id
-    DynamoDBTable = aws_dynamodb_table.dynamodbTable.name
-    SnsTopicArn   = local.sns_topic_arn
-    Tags          = jsonencode(var.tags)
+    EFSLifecyclePolicies = jsonencode(var.efs_lifecycle_policies)
+    Encrypted            = var.encrypted
+    KmsKeyId             = var.kms_key_id == null ? "" : var.kms_key_id
+    DynamoDBTable        = aws_dynamodb_table.dynamodbTable.name
+    SnsTopicArn          = local.sns_topic_arn
+    Tags                 = jsonencode(var.tags)
   }
 }
 

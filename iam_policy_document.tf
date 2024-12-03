@@ -117,7 +117,9 @@ data "aws_iam_policy_document" "step_function_role" {
       "elasticfilesystem:DescribeAccessPoints",
       "elasticfilesystem:DeleteAccessPoint",
       "elasticfilesystem:DescribeMountTargetSecurityGroups",
-      "elasticfilesystem:ModifyMountTargetSecurityGroups"
+      "elasticfilesystem:ModifyMountTargetSecurityGroups",
+      "elasticfilesystem:DescribeLifecycleConfiguration",
+      "elasticfilesystem:PutLifecycleConfiguration",
     ]
     resources = ["*"]
   }

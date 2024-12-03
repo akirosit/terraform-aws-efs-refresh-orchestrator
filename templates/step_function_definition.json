@@ -150,6 +150,16 @@
     },
     "POST-RESTORE": {
       "Type": "Pass",
+      "Next": "update-efs-lifecycle-configuration"
+    },
+    "update-efs-lifecycle-configuration": {
+      "Type": "Task",
+      "Parameters": {
+        "FileSystemId.$": "$.get-restore-status-result.FileSystemId",
+        "LifecyclePolicies.$": "$.EFSLifecyclePolicies"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:efs:putLifecycleConfiguration",
+      "ResultPath": "$.update-efs-lifecycle-configuration",
       "Next": "create-efs-access-point"
     },
     "create-efs-access-point": {

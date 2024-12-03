@@ -10,6 +10,7 @@
     "LambdaEfsFunction": "${LambdaEfsFunction}",
     "SubnetIDs": ${SubnetIDs},
     "SecurityGroupID": ${SecurityGroupID},
+    "EFSLifecyclePolicies": ${EFSLifecyclePolicies},
     "StoreEfsMetadataInSSM": ${StoreEfsMetadataInSSM},
     "EfsIdSSMParameterName": "${EfsIdSSMParameterName}",
     "EfsSubPathSSMParameterName": "${EfsSubPathSSMParameterName}",
