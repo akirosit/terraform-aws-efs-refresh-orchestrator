@@ -1,6 +1,9 @@
 # This file is used to create step function and associated input json files
 
 locals {
+  efs_lifecycle_policies = [
+    { for key, value in var.efs_lifecycle_policies[0] : key => value if value != null }
+  ]
   step_function_input = {
     AppName                    = var.app_name
     EnvName                    = var.env_name
@@ -18,7 +21,7 @@ locals {
       var.efs_sg_id,
       aws_security_group.lambda.id
     ])
-    EFSLifecyclePolicies = jsonencode(var.efs_lifecycle_policies)
+    EFSLifecyclePolicies = jsonencode(local.efs_lifecycle_policies)
     Encrypted            = var.encrypted
     KmsKeyId             = var.kms_key_id == null ? "" : var.kms_key_id
     DynamoDBTable        = aws_dynamodb_table.dynamodbTable.name
