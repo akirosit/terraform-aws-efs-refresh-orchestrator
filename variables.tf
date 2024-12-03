@@ -47,9 +47,9 @@ variable "kms_key_id" {
 variable "efs_lifecycle_policies" {
   description = "EFS lifecycle policies"
   type = list(object({
-    TransitionToArchive             = string
-    TransitionToIA                  = string
-    TransitionToPrimaryStorageClass = string
+    TransitionToArchive             = optional(string)
+    TransitionToIA                  = optional(string)
+    TransitionToPrimaryStorageClass = optional(string)
   }))
   default = []
 }
