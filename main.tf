@@ -2,7 +2,8 @@
 
 locals {
   efs_lifecycle_policies = [
-    { for key, value in var.efs_lifecycle_policies[0] : key => value if value != null }
+    for key, value in try(var.efs_lifecycle_policies[0], {}) :
+    { "${key}" = value } if value != null
   ]
   step_function_input = {
     AppName                    = var.app_name
