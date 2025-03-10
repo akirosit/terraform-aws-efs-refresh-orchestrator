@@ -18,25 +18,25 @@ resource "aws_security_group_rule" "lambda_https_egress" {
   cidr_blocks       = ["0.0.0.0/0"]
 }
 
-resource "aws_security_group_rule" "lambda_efs_egress" {
-  for_each                 = toset([var.efs_sg_id])
-  security_group_id        = aws_security_group.lambda.id
-  type                     = "egress"
-  protocol                 = "tcp"
-  from_port                = 2049
-  to_port                  = 2049
-  source_security_group_id = each.value
-}
+# resource "aws_security_group_rule" "lambda_efs_egress" {
+#   for_each                 = toset([var.efs_sg_id])
+#   security_group_id        = aws_security_group.lambda.id
+#   type                     = "egress"
+#   protocol                 = "tcp"
+#   from_port                = 2049
+#   to_port                  = 2049
+#   source_security_group_id = each.value
+# }
 
-resource "aws_security_group_rule" "efs_from_lambda" {
-  for_each                 = toset([var.efs_sg_id])
-  security_group_id        = each.value
-  type                     = "ingress"
-  protocol                 = "tcp"
-  from_port                = 2049
-  to_port                  = 2049
-  source_security_group_id = aws_security_group.lambda.id
-}
+# resource "aws_security_group_rule" "efs_from_lambda" {
+#   for_each                 = toset([var.efs_sg_id])
+#   security_group_id        = each.value
+#   type                     = "ingress"
+#   protocol                 = "tcp"
+#   from_port                = 2049
+#   to_port                  = 2049
+#   source_security_group_id = aws_security_group.lambda.id
+# }
 
 output "vpc_security_group_for_lambda" {
   value = aws_security_group.lambda.id
